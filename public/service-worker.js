@@ -1,11 +1,12 @@
 const APP_PREFIX = 'BudgetTracker-';
 const VERSION = 'version_01';
+const DATA_CACHE_NAME = 'data_cache_name';
 const CACHE_NAME = APP_PREFIX + VERSION
 
 const FILES_TO_CACHE = [
     '/',
     '/index.html',
-    '/css/style.css',
+    '/css/styles.css',
     '/js/index.js',
     '/js/idb.js',
     '/manifest.json',
@@ -19,16 +20,40 @@ const FILES_TO_CACHE = [
     '/icons/icon-512x512.png'
 ];
 
-self.addEventListener('fetch', function (e) {
-    console.log('fetch request : ' + e.request.url)
-    e.respondWith(
-        caches.match(e.request).then(function (e) {
+self.addEventListener('fetch', function (evt) {
+    if (evt.request.url.includes('/api/')) {
+        evt.respondWith(
+            caches
+                .open(DATA_CACHE_NAME)
+                .then(cache => {
+                    return fetch(evt.request)
+                        .then(response => {
+                            // If the response was good, clone it and store it in the cache.
+                            if (response.status === 200) {
+                                cache.put(evt.request.url, response.clone());
+                            }
+
+                            return response;
+                        })
+                        .catch(err => {
+                            // Network request failed, try to get it from the cache.
+                            return cache.match(evt.request);
+                        });
+                })
+                .catch(err => console.log(err))
+        );
+
+        return;
+    }
+    console.log('fetch request : ' + evt.request.url)
+    evt.respondWith(
+        caches.match(evt.request).then(function (request) {
             if (request) {
-                console.log('responding with cache : ' + e.request.url)
+                console.log('responding with cache : ' + evt.request.url)
                 return request
             } else {
-                console.log('file is not cached, fetching : ' + e.request.url)
-                return fetch(e.request)
+                console.log('file is not cached, fetching : ' + evt.request.url)
+                return fetch(evt.request)
             }
         })
     )
